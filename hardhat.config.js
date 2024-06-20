@@ -6,8 +6,8 @@ module.exports = {
   networks: {
     hardhat: {
       forking: {
-        url: "https://eth-mainnet.g.alchemy.com/v2/N-Gnpjy1WvCfokwj6fiOfuAVL_At6IvE",
+        url: "https://public.stackup.sh/api/v1/node/ethereum-mainnet",
       },
-    }
-  }
+    },
+  },
 };
