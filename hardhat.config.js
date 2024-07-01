@@ -8,6 +8,6 @@ module.exports = {
       forking: {
         url: "https://public.stackup.sh/api/v1/node/ethereum-mainnet",
       },
-    },
-  },
+    }
+  }
 };
