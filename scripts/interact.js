@@ -138,6 +138,7 @@ async function stakingInteraction() {
   );
   console.log("Total TON supply: ", totalTONSupply);
 
+
   //Build data field, 2 addresses: depositManagerAddress and Tokamak1Layer2Address
   let firstDataPart = padLeft(unmarshalString(depositManagerAddress), 64);
   let secondPart = unmarshalString(
@@ -163,41 +164,21 @@ async function stakingInteraction() {
     )
   );
   console.log();
+  console.log();
+  console.log();
   console.log(
     "===============CALL approveAndCall FROM TON for 100 tokens==============="
-  );
-  console.log(
-    "Block number before approve and call : ",
-    await ethers.provider.getBlockNumber()
   );
   await TON.approveAndCall(
     WTONMainnetAddress,
     amountInWeiForApproveAndCall,
     data
   );
-  console.log(
-    "Block number after approve and call: ",
-    await ethers.provider.getBlockNumber()
-  );
   console.log();
-  console.log(
-    "AccStakedAccount balance after deposit in Manager contract: ",
-    ethers.utils.formatUnits(
-      await DepositManager.accStakedAccount(deployerAddress),
-      27
-    )
-  );
-  console.log(
-    "Total WTON stake by user on Layer2 after deposit: ",
-    ethers.utils.formatUnits(
-      await DepositManager.accStaked(Tokamak1Layer2Address, deployerAddress),
-      27
-    )
-  );
 
-  console.log("===============Check data from CoinAge contract===============");
-  //await ethers.provider.send("hardhat_mine", ["0x989680"]);
-  //updateSeigniorage();
+  console.log("===============Update Seigniorage===============");
+
+  //mine blocks
   const seigManagetAddress = "0x0b55a0f463b6defb81c6063973763951712d0e5f";
   const SeigManager = await ethers.getContractAt(
     SeigManagerABI,
@@ -207,95 +188,21 @@ async function stakingInteraction() {
   const coinageAddress = await SeigManager.coinages(Tokamak1Layer2Address);
   const CoinAge = await ethers.getContractAt(CoinAgeABI, coinageAddress);
   const coinageBalance = await CoinAge.balanceOf(deployer.address);
+
+  console.log("User WTON balance before update: ", ethers.utils.formatUnits(coinageBalance,27));
+  console.log();
+
+  let accRelativeSeigRate1 = await SeigManager.accRelativeSeig();
   console.log(
-    "User WTON balance after deposit:",
-    ethers.utils.formatUnits(coinageBalance, 27)
+    "acc relative 1 ",
+    ethers.utils.formatUnits(accRelativeSeigRate1, 27)
   );
 
-  const newTONBalance = await TON.balanceOf(deployer.address);
-  console.log("User TON balance in wallet after deposit:", ethers.utils.formatUnits(newTONBalance, "ether"));
-  console.log()
-
-  //back to update Signorige
-  let coinAgeAddress = await SeigManager.coinages(Tokamak1Layer2Address);
-  const refactorContractUpdateSeignioarege = await ethers.getContractAt(
-    RefactorCoinageSnapshotABI,
-    coinAgeAddress
-  );
-
-
-  console.log("===============Update Seigniorage===============");
   //Impersonate the Layer2 address for update the seigniorage
-  await ethers.provider.send("hardhat_impersonateAccount", [Tokamak1Layer2Address]);
-  const signerForLayer2= await ethers.getSigner(Tokamak1Layer2Address);
-  console.log("DEPOSIT MANAGER BALANCE BEFORE MINE BLOCKS UPDATE",ethers.utils.formatUnits((await WTON.balanceOf(depositManagerAddress)).toString(),27));
-  await ethers.provider.send("hardhat_mine", ["0x989680"]); //10.000.000 blocks
-  console.log("DEPOSIT MANAGER BALANCE AFTER MINE BLOCKS UPDATE",ethers.utils.formatUnits((await WTON.balanceOf(depositManagerAddress)).toString(),27));
-  const ethToSet = ethers.utils.parseEther("1.0");
-  await ethers.provider.send("hardhat_setBalance", [
-      Tokamak1Layer2Address,
-      ethToSet.toHexString()
-  ]);
-
-  console.log("Block number: ",await ethers.provider.getBlockNumber());
-  const updateTX = await SeigManager.connect(signerForLayer2).updateSeigniorage();
-  await updateTX.wait();
-
-  console.log("DEPOSIT MANAGER BALANCE AFTER UPDATE",ethers.utils.formatUnits((await WTON.balanceOf(depositManagerAddress)).toString(),27));
-
-  const balanceAfterUpdate = await CoinAge.balanceOf(deployer.address);
-  console.log("Block number: ",await ethers.provider.getBlockNumber());
-  console.log("User WTON balance after updateSeigniorage:", ethers.utils.formatUnits(balanceAfterUpdate, 27));
-  await ethers.provider.send("hardhat_stopImpersonatingAccount", [Tokamak1Layer2Address]);
-  console.log()
-
-  let totalWTONSupplyAfterMine =  ethers.utils.formatUnits((await WTON.totalSupply()),27)
-  console.log("Total WTON supply after mine: ", totalWTONSupplyAfterMine);
-
-  let totalTONSupplyAfterMine =  ethers.utils.formatUnits((await TON.totalSupply()),"ether")
-  console.log("Total TON supply after mine: ", totalTONSupplyAfterMine);
-
-  let prevTotSupplyAfterUpdate = await SeigManager.stakeOfTotal();
-  console.log("prevTotSupplyAfterUpdate: ", ethers.utils.formatUnits(prevTotSupplyAfterUpdate, 27));
-
-  let afterUpdateSeigniorageTotalSupply = ethers.BigNumber.from(await refactorContractUpdateSeignioarege.totalSupply())
-  console.log("afterUpdateSeigniorageTotalSupply ",  ethers.utils.formatUnits(afterUpdateSeigniorageTotalSupply,27))
-
-  console.log("===============Withdraw request===============");
-
-  //Request to withdraw 10 tokens
-  const rwTx = await DepositManager.requestWithdrawal(Tokamak1Layer2Address, "10000000000000000000000000000");
-  await rwTx.wait();
-
-  const walletWTONAmountBeforeWithdraw = await WTON.balanceOf(deployer.address);
-  console.log("User WTON balance in wallet before processing withdrawal:", ethers.utils.formatUnits(walletWTONAmountBeforeWithdraw, 27));
-  //Cover DTD
-  await ethers.provider.send("hardhat_mine", ["0x989680"]);
-  const prTx = await DepositManager.processRequest(Tokamak1Layer2Address, false);
-  await prTx.wait();
-
-  const finalWtonBalance = await WTON.balanceOf(deployer.address);
-  console.log("User WTON balance in wallet after processing withdrawal:", ethers.utils.formatUnits(finalWtonBalance, 27));
-  console.log()
-}
-
-
-async function updateSeigniorage() {
-  const seigManagetAddress = "0x0b55a0f463b6defb81c6063973763951712d0e5f";
-  const SeigManager = await ethers.getContractAt(
-    SeigManagerABI,
-    seigManagetAddress
-  );
-  let blockNumber = await ethers.provider.getBlockNumber();
-  let lastSeigBlock = await SeigManager.lastSeigBlock();
-  if (blockNumber <= lastSeigBlock) {
-    return;
-  }
-
-  const Tokamak1Layer2Address = "0x36101b31e74c5E8f9a9cec378407Bbb776287761";
   await ethers.provider.send("hardhat_impersonateAccount", [
     Tokamak1Layer2Address,
   ]);
+
   const signerForLayer2 = await ethers.getSigner(Tokamak1Layer2Address);
   const ethToSet = ethers.utils.parseEther("1.0");
   await ethers.provider.send("hardhat_setBalance", [
@@ -303,220 +210,57 @@ async function updateSeigniorage() {
     ethToSet.toHexString(),
   ]);
 
-  //RAY FORMAT
-  let operatorAmount = await getOperatorAmount(Tokamak1Layer2Address);
-  let minimumAmount = await SeigManager.minimumAmount();
-  if (operatorAmount < minimumAmount) {
-    return;
-  }
+  await ethers.provider.send("hardhat_mine", ["0x989680"]); //10.000.000 blocks
+  const updateTX = await SeigManager.connect(
+    signerForLayer2
+  ).updateSeigniorage();
+  await updateTX.wait();
 
-  let coinage = await SeigManager.coinages(Tokamak1Layer2Address);
-  _increaseTot();
-
-  let _lastCommitBlockL1 = blockNumber;
-  const RefactorCoinageSnapshotI = await ethers.getContractAt(
-    RefactorCoinageSnapshotABI,
-    coinage
-  );
-  let prevTotalSupply = ethers.BigNumber.from(
-    await RefactorCoinageSnapshotI.totalSupply()
+  const coinageBalanceAfter = await CoinAge.balanceOf(deployer.address);
+  console.log(
+    "User WTON balance after update Seigniorage",
+    ethers.utils.formatUnits(coinageBalanceAfter, 27)
   );
 
-  let _totAddress = await SeigManager.tot();
-  const RefactorCoinageSnapshotIForTOT = await ethers.getContractAt(
-    RefactorCoinageSnapshotABI,
-    _totAddress
+  let accRelativeSeigRate = await SeigManager.accRelativeSeig();
+  console.log(
+    "acc relative ",
+    ethers.utils.formatUnits(accRelativeSeigRate, 27)
   );
-  let nextTotalSupply = ethers.BigNumber.from(
-    await RefactorCoinageSnapshotIForTOT.balanceOf(Tokamak1Layer2Address)
-  );
-  if (prevTotalSupply.gt(nextTotalSupply)) {
-    return true;
-  }
 
-  let seigs = ethers.BigNumber.from(nextTotalSupply).sub(
-    ethers.BigNumber.from(prevTotalSupply)
-  );
-  let Layer2Instance = await ethers.getContractAt(
-    Layer2IABI,
-    Tokamak1Layer2Address
-  );
-  let operator = await Layer2Instance.operator();
-
-  let isCommissionRateNegative_ = await SeigManager.isCommissionRateNegative(
-    Tokamak1Layer2Address
-  );
-  let operatorSeigs;
-  let result = await _calcSeigsDistribution(
+  await ethers.provider.send("hardhat_stopImpersonatingAccount", [
     Tokamak1Layer2Address,
-    coinage,
-    prevTotalSupply,
-    seigs,
-    isCommissionRateNegative_,
-    operator
-  );
-  console.log(
-    "prev tot supply ",
-    ethers.utils.formatUnits(prevTotalSupply, 27)
-  );
-  console.log(
-    "nextTotalSupply from calc ",
-    ethers.utils.formatUnits(result[0], 27)
-  );
+  ]);
 
-  console.log("operatorSeigs ", result[1]);
-  let coinageFactor = await RefactorCoinageSnapshotI.factor();
-  console.log(" coinageFactor ", ethers.utils.formatUnits(coinageFactor, 27));
-  // let setFactorValue = _calcNewFactor(prevTotalSupply,result[0], coinageFactor);
-  // await RefactorCoinageSnapshotI.connect(signerForLayer2).setFactor(setFactorValue);
-}
 
-async function _increaseTot() {
-  const seigManagetAddress = "0x0b55a0f463b6defb81c6063973763951712d0e5f";
-  const SeigManager = await ethers.getContractAt(
-    SeigManagerABI,
-    seigManagetAddress
-  );
-  let seigPerBlock = ethers.BigNumber.from(await SeigManager.seigPerBlock());
-  let blockNumber = await ethers.provider.getBlockNumber();
+  // console.log("===============Withdraw request===============");
 
-  if (blockNumber <= seigPerBlock) {
-    return false;
-  }
-}
+  // //Request to withdraw 10 tokens
+  // const rwTx = await DepositManager.requestWithdrawal(
+  //   Tokamak1Layer2Address,
+  //   "10000000000000000000000000000"
+  // );
+  // await rwTx.wait();
 
-async function getOperatorAmount(layer2) {
-  let Layer2Instance = await ethers.getContractAt(Layer2IABI, layer2);
-  let operatorAddress = await Layer2Instance.operator();
-  const seigManagetAddress = "0x0b55a0f463b6defb81c6063973763951712d0e5f";
-  const SeigManager = await ethers.getContractAt(
-    SeigManagerABI,
-    seigManagetAddress
-  );
-  let coinAges = await SeigManager.coinages(layer2);
-  const refactorContractUpdateSeignioaregeTotToken = await ethers.getContractAt(
-    RefactorCoinageSnapshotABI,
-    coinAges
-  );
-  let balance = await refactorContractUpdateSeignioaregeTotToken.balanceOf(
-    operatorAddress
-  );
-  return balance;
-}
+  // const walletWTONAmountBeforeWithdraw = await WTON.balanceOf(deployer.address);
+  // console.log(
+  //   "User WTON balance in wallet before processing withdrawal:",
+  //   ethers.utils.formatUnits(walletWTONAmountBeforeWithdraw, 27)
+  // );
+  // //Cover DTD
+  // await ethers.provider.send("hardhat_mine", ["0x989680"]);
+  // const prTx = await DepositManager.processRequest(
+  //   Tokamak1Layer2Address,
+  //   false
+  // );
+  // await prTx.wait();
 
-async function _calcSeigsDistribution(
-  layer2,
-  coinage,
-  prevTotalSupplyValue,
-  seigs,
-  _isCommissionRateNegative,
-  operator
-) {
-  console.log("Calc distribution");
-  const seigManagetAddress = "0x0b55a0f463b6defb81c6063973763951712d0e5f";
-  const Tokamak1Layer2Address = "0x36101b31e74c5E8f9a9cec378407Bbb776287761";
-  const SeigManager = await ethers.getContractAt(
-    SeigManagerABI,
-    seigManagetAddress
-  );
-  let _commissionRatesL2;
-  let operatorSeigs = 0;
-  let delayedCommissionBlockL2 = await SeigManager.delayedCommissionBlock(
-    layer2
-  );
-  let blockNumber = await ethers.provider.getBlockNumber();
-  if (
-    blockNumber >= delayedCommissionBlockL2 &&
-    delayedCommissionBlockL2 != 0
-  ) {
-    console.log(
-      "blockNumber >= delayedCommissionBlock && delayedCommissionBlock !=0"
-    );
-    _commissionRatesL2 = await SeigManager.delayedCommissionRate(
-      Tokamak1Layer2Address
-    );
-    _isCommissionRateNegativeL2 =
-      await SeigManager.delayedCommissionRateNegative(Tokamak1Layer2Address);
-    delayedCommissionBlockL2 = 0;
-  }
-  let comissionRate = await SeigManager.commissionRates(Tokamak1Layer2Address);
-  let nextTotSupply = ethers.BigNumber.from(prevTotalSupplyValue).add(
-    ethers.BigNumber.from(seigs)
-  );
-  console.log("nextTotSupply ", nextTotSupply);
-  console.log(comissionRate);
-  if (comissionRate == 0) {
-    console.log("comissionRate=0");
-    return [nextTotSupply, operatorSeigs];
-  }
-  if (!_isCommissionRateNegative) {
-    console.log("_isCommissionRateNegative ");
-    operatorSeigs = ethers.BigNumber.from(seigs).mul(
-      ethers.BigNumber.from(comissionRate)
-    );
-    nextTotSupply = ethers.BigNumber.from(nextTotSupply).sub(
-      ethers.BigNumber.from(operatorSeigs)
-    );
-    console.log(operatorSeigs);
-    console.log(nextTotSupply);
-    return [nextTotSupply, operatorSeigs];
-  }
-
-  if (prevTotalSupplyValue == 0) {
-    console.log("prevTotalSupplyValue===0");
-    return [nextTotSupply, operatorSeigs];
-  }
-
-  let coinAgeContract = await ethers.getContractAt(
-    RefactorCoinageSnapshotABI,
-    coinage
-  );
-  let operatorBalance = await coinAgeContract.balanceOf(operator);
-  if (operatorBalance === 0) {
-    return [nextTotSupply, operatorSeigs];
-  }
-
-  let operatorRate = ethers.BigNumber.from(operatorBalance).div(
-    ethers.BigNumber.from(prevTotalSupplyValue)
-  );
-  let seigsOperatorRate = ethers.BigNumber.from(seigs).mul(
-    ethers.BigNumber.from(operatorRate)
-  );
-  operatorSeigs = ethers.BigNumber.form(comissionRate).mul(seigsOperatorRate);
-
-  let RAY = ethers.BigNumber.from("1000000000000000000000000000");
-  let delegatorSeigsElseFirstPart = ethers.BigNumber.from(RAY).sub(
-    ethers.BigNumber.from(operatorRate)
-  );
-  let delegatorSeigsElseSecondPart = ethers.BigNumber.from(operatorSeigs).div(
-    delegatorSeigsElseFirstPart
-  );
-
-  let delegatorSeigs =
-    ethers.BigNumber.from(operatorRate) === ethers.BigNumber.from(RAY)
-      ? operatorSeigs
-      : delegatorSeigsElseSecondPart;
-
-  let operatorSeigsElseFirstPart = ethers.BigNumber.from(delegatorSeigs).mul(
-    ethers.BigNumber.from(operatorRate)
-  );
-  let operatorSeigsElseSecondPart =
-    operatorSeigsElseFirstPart.add(operatorSeigs);
-  operatorSeigs =
-    ethers.BigNumber.from(operatorRate) === ethers.BigNumber.from(RAY)
-      ? operatorSeigs
-      : operatorSeigsElseSecondPart;
-
-  nextTotSupply = nextTotSupply.add(delegatorSeigs);
-  console.log("last");
-  return [nextTotSupply, operatorSeigs];
-}
-
-function _calcNewFactor(source, target, oldFactor) {
-  let firstPart = ethers.BigNumber.from(target).mul(
-    ethers.BigNumber.from(oldFactor)
-  );
-  return firstPart.div(ethers.BigNumber.from(source));
+  // const finalWtonBalance = await WTON.balanceOf(deployer.address);
+  // console.log(
+  //   "User WTON balance in wallet after processing withdrawal:",
+  //   ethers.utils.formatUnits(finalWtonBalance, 27)
+  // );
+  // console.log();
 }
 
 stakingInteraction();
