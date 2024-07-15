@@ -145,7 +145,7 @@ async function stakingInteraction() {
     data
   );
 
-  console.log("MINE 10,000,000 BLOCKS")
+  console.log("MINE 10,000,000 BLOCKS");
   await ethers.provider.send("hardhat_mine", ["0x989680"]);
   const seigManagetAddress = "0x0b55a0f463b6defb81c6063973763951712d0e5f";
   const SeigManager = await ethers.getContractAt(
@@ -156,21 +156,21 @@ async function stakingInteraction() {
   //update signiorage function
 
   let blockNumber = await ethers.provider.getBlockNumber();
-  console.log("Block number:",blockNumber);
+  console.log("Block number:", blockNumber);
   let lastSeigBlock = await SeigManager.lastSeigBlock();
   if (blockNumber <= lastSeigBlock) {
     return;
   }
 
   let operatorAmount = await getOperatorAmount(Tokamak1Layer2Address);
-  console.log("Operator amount:", ethers.utils.formatUnits(operatorAmount,27));
+  console.log("Operator amount:", ethers.utils.formatUnits(operatorAmount, 27));
   let minimumAmount = await SeigManager.minimumAmount();
   if (operatorAmount < minimumAmount) {
     return;
   }
-  console.log("Min amount:", ethers.utils.formatUnits(minimumAmount,27));
+  console.log("Min amount:", ethers.utils.formatUnits(minimumAmount, 27));
   let coinage = await SeigManager.coinages(Tokamak1Layer2Address);
-  console.log("Call increaseTot function:")
+  console.log("Call increaseTot function:");
   await _increaseTot();
   let _lastCommitBlockL1 = blockNumber;
   const CoinAge = await ethers.getContractAt(CoinAgeABI, coinage);
@@ -186,7 +186,10 @@ async function stakingInteraction() {
     await RefactorCoinageSnapshotIForTOT.balanceOf(Tokamak1Layer2Address)
   );
 
-  console.log("Prev total supply", ethers.utils.formatUnits(prevTotalSupply, 27));
+  console.log(
+    "Prev total supply",
+    ethers.utils.formatUnits(prevTotalSupply, 27)
+  );
   console.log(
     "nextTotalSupply total supply: ",
     ethers.utils.formatUnits(nextTotalSupply, 27)
@@ -199,7 +202,7 @@ async function stakingInteraction() {
     ethers.BigNumber.from(prevTotalSupply)
   );
 
-  console.log("Seigs: ",ethers.utils.formatUnits(seigs,27));
+  console.log("Seigs: ", ethers.utils.formatUnits(seigs, 27));
   let Layer2Instance = await ethers.getContractAt(
     Layer2IABI,
     Tokamak1Layer2Address
@@ -223,7 +226,7 @@ async function stakingInteraction() {
   console.log("Results from _calcSeigsDistribution:");
   let nextTotSupply = result[0];
   let operatorSeigs = result[1];
-  console.log("nextTotSupply ", ethers.utils.formatUnits(nextTotSupply,27));
+  console.log("nextTotSupply ", ethers.utils.formatUnits(nextTotSupply, 27));
   console.log("operatorSeigs ", operatorSeigs);
   let coinageFactor = await CoinAge.factor();
 
@@ -245,8 +248,16 @@ async function stakingInteraction() {
     coinageFactor
   );
 
-  console.log("Set factor in coinage contract")
+  console.log("Set factor in coinage contract");
   await CoinAge.connect(signerForLayer2).setFactor(setFactorValue);
+
+  if (operatorSeigs != 0) {
+    if (isCommissionRateNegative_) {
+       CoinAge.connect(signerForLayer2).burnFrom(operator,operatorSeigs);
+    } else {
+       CoinAge.connect(signerForLayer2).mint(operator, operatorSeigs);
+    }
+  }
 
   console.log("Mint WTON:");
   await WTON.connect(signerForLayer2).mint(depositManagerAddress, seigs);
@@ -407,7 +418,6 @@ async function _calcSeigsDistribution(
 ) {
   console.log("Calc distribution");
   const seigManagetAddress = "0x0b55a0f463b6defb81c6063973763951712d0e5f";
-  const Tokamak1Layer2Address = "0x36101b31e74c5E8f9a9cec378407Bbb776287761";
   const SeigManager = await ethers.getContractAt(
     SeigManagerABI,
     seigManagetAddress
