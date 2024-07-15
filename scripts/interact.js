@@ -145,7 +145,7 @@ async function stakingInteraction() {
     padLeft(unmarshalString(Tokamak1Layer2Address), 64)
   );
   const data = firstDataPart + secondPart;
-  const amountInWeiForApproveAndCall = ethers.utils.parseEther("100");
+  const amountInWeiForApproveAndCall = ethers.utils.parseEther("10");
   console.log(
     "===============Deposit Manager contract data before call approveAndCall==============="
   );
@@ -167,7 +167,7 @@ async function stakingInteraction() {
   console.log();
   console.log();
   console.log(
-    "===============CALL approveAndCall FROM TON for 100 tokens==============="
+    "===============CALL approveAndCall FROM TON for 10 tokens==============="
   );
   await TON.approveAndCall(
     WTONMainnetAddress,
@@ -193,10 +193,6 @@ async function stakingInteraction() {
   console.log();
 
   let accRelativeSeigRate1 = await SeigManager.accRelativeSeig();
-  console.log(
-    "acc relative 1 ",
-    ethers.utils.formatUnits(accRelativeSeigRate1, 27)
-  );
 
   //Impersonate the Layer2 address for update the seigniorage
   await ethers.provider.send("hardhat_impersonateAccount", [
@@ -210,6 +206,7 @@ async function stakingInteraction() {
     ethToSet.toHexString(),
   ]);
 
+  console.log("MINE 10,000,000 BLOCKS");
   await ethers.provider.send("hardhat_mine", ["0x989680"]); //10.000.000 blocks
   const updateTX = await SeigManager.connect(
     signerForLayer2
@@ -223,44 +220,40 @@ async function stakingInteraction() {
   );
 
   let accRelativeSeigRate = await SeigManager.accRelativeSeig();
-  console.log(
-    "acc relative ",
-    ethers.utils.formatUnits(accRelativeSeigRate, 27)
-  );
 
   await ethers.provider.send("hardhat_stopImpersonatingAccount", [
     Tokamak1Layer2Address,
   ]);
 
 
-  // console.log("===============Withdraw request===============");
+  console.log("===============Withdraw request===============");
 
-  // //Request to withdraw 10 tokens
-  // const rwTx = await DepositManager.requestWithdrawal(
-  //   Tokamak1Layer2Address,
-  //   "10000000000000000000000000000"
-  // );
-  // await rwTx.wait();
+  //Request to withdraw 10 tokens
+  const rwTx = await DepositManager.requestWithdrawal(
+    Tokamak1Layer2Address,
+    "10000000000000000000000000000"
+  );
+  await rwTx.wait();
 
-  // const walletWTONAmountBeforeWithdraw = await WTON.balanceOf(deployer.address);
-  // console.log(
-  //   "User WTON balance in wallet before processing withdrawal:",
-  //   ethers.utils.formatUnits(walletWTONAmountBeforeWithdraw, 27)
-  // );
-  // //Cover DTD
-  // await ethers.provider.send("hardhat_mine", ["0x989680"]);
-  // const prTx = await DepositManager.processRequest(
-  //   Tokamak1Layer2Address,
-  //   false
-  // );
-  // await prTx.wait();
+  const walletWTONAmountBeforeWithdraw = await WTON.balanceOf(deployer.address);
+  console.log(
+    "User WTON balance in wallet before processing withdrawal:",
+    ethers.utils.formatUnits(walletWTONAmountBeforeWithdraw, 27)
+  );
+  //Cover DTD
+  await ethers.provider.send("hardhat_mine", ["0x989680"]);
+  const prTx = await DepositManager.processRequest(
+    Tokamak1Layer2Address,
+    false
+  );
+  await prTx.wait();
 
-  // const finalWtonBalance = await WTON.balanceOf(deployer.address);
-  // console.log(
-  //   "User WTON balance in wallet after processing withdrawal:",
-  //   ethers.utils.formatUnits(finalWtonBalance, 27)
-  // );
-  // console.log();
+  const finalWtonBalance = await WTON.balanceOf(deployer.address);
+  console.log(
+    "User WTON balance in wallet after processing withdrawal:",
+    ethers.utils.formatUnits(finalWtonBalance, 27)
+  );
+  console.log();
 }
 
 stakingInteraction();
